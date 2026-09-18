@@ -1,0 +1,61 @@
+{
+  "name": "pantilt_camera_calibration",
+  "source_samples": "config/calibration/charuco_sessions/20260602_164309/samples.json",
+  "model": {
+    "pan_axis": "z",
+    "tilt_axis": "x",
+    "pan_sign": 1.0,
+    "tilt_sign": 1.0,
+    "pan_zero_deg": 36.254760900141505,
+    "tilt_zero_deg": 86.09035478973692
+  },
+  "parent_frame": "tilt_link",
+  "child_frame": "camera_color_optical_frame",
+  "translation": [
+    0.04845099060909162,
+    -0.027941590792007386,
+    0.08346652865366226
+  ],
+  "rotation_rotvec": [
+    0.029532786442700455,
+    -2.1362717564071705,
+    2.2635758679385245
+  ],
+  "rotation_rpy": [
+    -1.5128091184324681,
+    -0.03369640044660338,
+    3.1335309267016003
+  ],
+  "base_board_pose": {
+    "parent_frame": "pan_base",
+    "child_frame": "charuco_board",
+    "translation": [
+      0.1805475597028726,
+      -0.37852491727211723,
+      0.19519247105529794
+    ],
+    "rotation_rpy": [
+      -1.5894344877876145,
+      0.010457898423009038,
+      -2.918381650010108
+    ]
+  },
+  "fit_summary": {
+    "translation_rmse_mm": 3.323534969539289,
+    "translation_max_mm": 6.605763036561388,
+    "rotation_rmse_deg": 1.3307157380163896,
+    "rotation_max_deg": 1.9290310453712955
+  },
+  "sample_count": 21,
+  "board": {
+    "squares_x": 11,
+    "squares_y": 8,
+    "square_length_m": 0.02,
+    "marker_length_m": 0.015,
+    "dictionary": "DICT_4X4_50",
+    "legacy_pattern": true
+  },
+  "result_name": "最久",
+  "copied_for_ui_selection": true,
+  "ui_label": "相机-云台 最久"
+}
