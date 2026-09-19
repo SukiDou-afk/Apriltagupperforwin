@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=68,<76", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "apriltag-robot-sdk"
+version = "2.0.0"
+description = "AprilTag localization, D435 and pan/tilt SDK with a PyQt6 upper computer"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+  "numpy==1.24.4; python_version < '3.9'",
+  "numpy>=1.26,<3; python_version >= '3.9'",
+  "opencv-contrib-python-headless==4.10.0.84; python_version < '3.9'",
+  "opencv-contrib-python-headless>=4.10,<6; python_version >= '3.9'",
+  "pyserial>=3.5,<4",
+]
+
+[project.optional-dependencies]
+qt = [
+  "PyQt6==6.7.1; python_version < '3.9'",
+  "PyQt6>=6.7,<7; python_version >= '3.9'",
+]
+camera = [
+  "pyrealsense2==2.55.1.6486; python_version < '3.9'",
+  "pyrealsense2>=2.55,<3; python_version >= '3.9'",
+]
+dev = ["pytest>=8,<10", "build>=1,<2"]
+
+[project.gui-scripts]
+apriltag-upper = "apriltag_sdk.qt.app:main"
+
+[tool.setuptools.packages.find]
+include = ["apriltag_sdk*"]
+
+[tool.setuptools.package-data]
+apriltag_sdk = ["assets/calibration/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

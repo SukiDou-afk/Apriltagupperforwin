@@ -1,5 +1,0 @@
-numpy
-opencv-contrib-python>=4.8
-pyrealsense2
-PySide6
-pyserial

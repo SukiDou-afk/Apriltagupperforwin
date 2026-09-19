@@ -11,12 +11,13 @@ os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import numpy as np
 import pytest
-from PySide6.QtCore import QSettings
-from PySide6.QtWidgets import QApplication
-from calibration import (CalibrationDocument, CalibrationChain, CalibrationError,
+from PyQt6.QtCore import QSettings
+from PyQt6.QtWidgets import QApplication
+from apriltag_sdk.calibration import (CalibrationDocument, CalibrationChain, CalibrationError,
                           calibration_readiness, _rpy_matrix, document_hash)
-from camera_options import SensorOptions, RGBOptionsWorker, RGBOptionsPanel
-from pantilt import PantiltSerial
+from apriltag_sdk.camera_options import SensorOptions, RGBOptionsWorker
+from apriltag_sdk.qt.camera_options import RGBOptionsPanel
+from apriltag_sdk.pantilt import PantiltSerial
 
 
 @pytest.fixture(scope='session')
@@ -24,11 +25,11 @@ def app():
     application = QApplication.instance() or QApplication([])
     yield application
     import gc
-    from PySide6.QtCore import QCoreApplication, QEvent
+    from PyQt6.QtCore import QCoreApplication, QEvent
     for widget in application.topLevelWidgets():
         widget.close()
         widget.deleteLater()
-    QCoreApplication.sendPostedEvents(None, QEvent.DeferredDelete)
+    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
     application.processEvents()
     gc.collect()
 
@@ -104,9 +105,9 @@ def test_provenance_never_blocks_file_selection(pair):
 
 
 def test_editor_source_switch_persistence_and_failure(app, pair, tmp_path):
-    from calibration_editor import CalibrationPanel
+    from apriltag_sdk.qt.calibration_editor import CalibrationPanel
     cam,arm=pair
-    settings=QSettings(str(tmp_path/'settings.ini'),QSettings.IniFormat)
+    settings=QSettings(str(tmp_path/'settings.ini'),QSettings.Format.IniFormat)
     panel=CalibrationPanel(settings); chains=[];panel.chain_changed.connect(chains.append)
     panel.editors['camera'].load(cam.path);panel.editors['arm'].load(arm.path)
     original=chains[-1].transform_point([0,0,1],90,90)
@@ -125,8 +126,8 @@ def test_editor_source_switch_persistence_and_failure(app, pair, tmp_path):
 
 
 def test_file_reload_invalidates_saved_copy(app,pair,tmp_path):
-    from calibration_editor import DocumentEditor
-    cam,_=pair;s=QSettings(str(tmp_path/'s.ini'),QSettings.IniFormat)
+    from apriltag_sdk.qt.calibration_editor import DocumentEditor
+    cam,_=pair;s=QSettings(str(tmp_path/'s.ini'),QSettings.Format.IniFormat)
     e=DocumentEditor('camera',s);e.load(cam.path);e.xyz[0].setValue(999)
     changed=copy.deepcopy(cam.original);changed['translation'][0]=.333
     Path(cam.path).write_text(json.dumps(changed))
@@ -153,7 +154,7 @@ class FakeSensor:
 
 
 def option_enum():
-    from camera_options import OPTION_LABELS
+    from apriltag_sdk.camera_options import OPTION_LABELS
     return SimpleNamespace(**{k:k for k in OPTION_LABELS})
 
 
@@ -173,7 +174,7 @@ def test_options_order_range_quantization_and_error():
 
 
 def test_option_thread_does_not_block_frame_producer(app):
-    from apriltag_upper import LatestFrameBuffer
+    from apriltag_sdk.qt.app import LatestFrameBuffer
     sensor=FakeSensor();sensor.delay=.15
     worker=RGBOptionsWorker(sensor,option_enum(),'fake');out=[]
     worker.snapshot_ready.connect(out.append)
@@ -190,7 +191,7 @@ def test_option_thread_does_not_block_frame_producer(app):
 
 
 def test_rgb_panel_restores_by_serial_and_disables_auto_dependents(app,tmp_path):
-    s=QSettings(str(tmp_path/'s.ini'),QSettings.IniFormat)
+    s=QSettings(str(tmp_path/'s.ini'),QSettings.Format.IniFormat)
     s.setValue('rgb_options/fake/enable_auto_exposure',0)
     s.setValue('rgb_options/fake/exposure',35)
     panel=RGBOptionsPanel(s);requests=[];panel.requested.connect(requests.append)
@@ -221,7 +222,7 @@ def test_command_frame_and_gbk_every_split():
 
 def test_apriltag_detection_pose_and_per_id_offset():
     import cv2
-    from apriltag_upper import DetectionWorker,LatestFrameBuffer,TAG_FAMILY
+    from apriltag_sdk.qt.app import DetectionWorker,LatestFrameBuffer,TAG_FAMILY
     image=np.full((700,900),255,np.uint8)
     tag=cv2.aruco.generateImageMarker(cv2.aruco.getPredefinedDictionary(TAG_FAMILY),3,220)
     image[200:420,400:620]=tag
@@ -237,12 +238,9 @@ def test_apriltag_detection_pose_and_per_id_offset():
 
 
 def test_main_window_cmd_only_and_home_independent(app,tmp_path,monkeypatch):
-    import apriltag_upper as gui
-    factory=lambda *_:QSettings(str(tmp_path/'gui.ini'),QSettings.IniFormat)
-    factory.IniFormat=QSettings.IniFormat
-    monkeypatch.setattr(gui,'QSettings',factory)
+    import apriltag_sdk.qt.app as gui
     monkeypatch.setattr(gui.MainWindow,'refresh_profiles',lambda *a,**k:None)
-    w=gui.MainWindow()
+    w=gui.MainWindow(settings_path=tmp_path/'gui.ini')
     before=w._angles_for_transform()
     w.feedback_pan=118;w.feedback_tilt=82;w.feedback_valid=True
     w.home_pan_spin.setValue(101)
@@ -253,7 +251,7 @@ def test_main_window_cmd_only_and_home_independent(app,tmp_path,monkeypatch):
 
 
 def test_capture_slow_detection_and_async_close(app,tmp_path,monkeypatch):
-    import apriltag_upper as gui
+    import apriltag_sdk.qt.app as gui
     import pyrealsense2 as rs
     sensor=FakeSensor();sensor.delay=.1
     profile=SimpleNamespace(
@@ -274,14 +272,13 @@ def test_capture_slow_detection_and_async_close(app,tmp_path,monkeypatch):
     # A numpy array has ambiguous truthiness, so use an ordinary frame handle.
     Pipeline.wait_for_frames=lambda self,_:(time.sleep(.01) or SimpleNamespace(get_color_frame=lambda:object()))
     monkeypatch.setattr(rs,'pipeline',Pipeline)
-    monkeypatch.setattr(gui,'color_frame_to_bgr',lambda *_:np.zeros((48,64,3),np.uint8))
+    from apriltag_sdk import camera as camera_core
+    monkeypatch.setattr(camera_core,'color_frame_to_bgr',lambda *_:np.zeros((48,64,3),np.uint8))
     def slow_detection(*_):time.sleep(.15);return [],[]
-    monkeypatch.setattr(gui.DetectionWorker,'_run_detection',slow_detection)
-    factory=lambda *_:QSettings(str(tmp_path/'gui.ini'),QSettings.IniFormat)
-    factory.IniFormat=QSettings.IniFormat
-    monkeypatch.setattr(gui,'QSettings',factory)
+    from apriltag_sdk.workers import DetectionWorker as DetectionCore
+    monkeypatch.setattr(DetectionCore,'_run_detection',slow_detection)
     monkeypatch.setattr(gui.MainWindow,'refresh_profiles',lambda *a,**k:None)
-    w=gui.MainWindow();w.show()
+    w=gui.MainWindow(settings_path=tmp_path/'gui.ini');w.show()
     w.profile_combo.addItem('fake',(64,48,30,rs.format.bgr8));w.profile_combo.setCurrentIndex(0)
     w.start_camera()
     deadline=time.monotonic()+1
@@ -298,7 +295,7 @@ def test_capture_slow_detection_and_async_close(app,tmp_path,monkeypatch):
 
 
 def test_stale_option_snapshot_still_persists_acknowledged_write(app,tmp_path):
-    s=QSettings(str(tmp_path/'options.ini'),QSettings.IniFormat)
+    s=QSettings(str(tmp_path/'options.ini'),QSettings.Format.IniFormat)
     panel=RGBOptionsPanel(s);panel.minimum_generation=2
     panel.update_snapshot(dict(serial='fake',records={},applied={'sharpness':4},errors=[],generation=1))
     assert float(s.value('rgb_options/fake/sharpness'))==4
@@ -306,8 +303,8 @@ def test_stale_option_snapshot_still_persists_acknowledged_write(app,tmp_path):
 
 
 def test_user_supplied_files_enable_base_and_view(app,tmp_path):
-    from calibration_editor import CalibrationPanel
-    s=QSettings(str(tmp_path/'defaults.ini'),QSettings.IniFormat)
+    from apriltag_sdk.qt.calibration_editor import CalibrationPanel
+    s=QSettings(str(tmp_path/'defaults.ini'),QSettings.Format.IniFormat)
     panel=CalibrationPanel(s);chains=[];panel.chain_changed.connect(chains.append)
     panel.restore()
     chain=chains[-1]
@@ -333,14 +330,68 @@ def test_user_supplied_files_enable_base_and_view(app,tmp_path):
 
 
 def test_saved_camera_example_path_is_respected(app,tmp_path,pair):
-    from calibration_editor import CalibrationPanel
+    from apriltag_sdk.qt.calibration_editor import CalibrationPanel
     cam,arm=pair
     example=tmp_path/'calibration_examples'/'my_camera.json'
     example.parent.mkdir()
     example.write_text(json.dumps(cam.original))
-    s=QSettings(str(tmp_path/'saved.ini'),QSettings.IniFormat)
+    s=QSettings(str(tmp_path/'saved.ini'),QSettings.Format.IniFormat)
     s.setValue('calibration/camera_to_gimbal',str(example))
     s.setValue('calibration/gimbal_to_arm',arm.path)
     panel=CalibrationPanel(s);chains=[];panel.chain_changed.connect(chains.append);panel.restore()
     assert chains[-1].camera.path==str(example.resolve())
     assert not chains[-1].blocked_reason
+
+
+def test_pyqt6_panel_binds_public_locator_without_changing_source_files(app,pair,tmp_path):
+    from apriltag_sdk import Locator
+    from apriltag_sdk.qt.calibration_editor import CalibrationPanel
+    panel=CalibrationPanel(QSettings(str(tmp_path/'binding.ini'),QSettings.Format.IniFormat))
+    loc=Locator(50);panel.bind_locator(loc)
+    cam,arm=pair
+    before=Path(cam.path).read_bytes()
+    panel.editors['camera'].load(cam.path);panel.editors['arm'].load(arm.path)
+    original=loc.calibration_chain().camera.t_tilt_camera[:3,3].copy()
+    panel.editors['camera'].xyz[0].setValue(100)
+    np.testing.assert_allclose(loc.calibration_chain().camera.t_tilt_camera[:3,3],original)
+    panel.source.setCurrentIndex(1)
+    assert loc.calibration_chain().camera.t_tilt_camera[0,3]==pytest.approx(.1)
+    assert Path(cam.path).read_bytes()==before
+    panel.close()
+
+
+def test_embedded_full_window_public_result_snapshot_and_stop(app,tmp_path,monkeypatch):
+    import apriltag_sdk.qt.app as gui
+    monkeypatch.setattr(gui.MainWindow,'refresh_profiles',lambda *a,**k:None)
+    window=gui.MainWindow(settings_path=tmp_path/'public.ini')
+    emitted=[];window.results_updated.connect(emitted.append)
+    row=dict(id=3,x_m=0.,y_m=0.,z_m=.5,target_x_m=.01,target_y_m=.02,target_z_m=.5)
+    window.on_detection_ready(dict(results=[row],overlays=[],frame_seq=1,captured_at=time.monotonic()))
+    data=window.result_snapshot()
+    assert data['targets'][0]['target_camera_mm']==[10.,20.,500.]
+    expected=1000*window.calibration.transform_point([.01,.02,.5],90,90)
+    np.testing.assert_allclose(data['targets'][0]['target_base_mm'],expected)
+    window._latest_detection_captured_at=time.monotonic()-2
+    assert window.result_snapshot() is None
+    window.stop_camera();assert emitted[-1] is None
+    window.close()
+
+
+def test_qt_bridge_polls_latest_and_clears_stale_without_qt_thread_backlog(app):
+    from apriltag_sdk import AprilTagSystem
+    from apriltag_sdk.qt.bridge import QtSystemBridge
+    from apriltag_sdk.qt.image import bgr_to_qimage
+    system=AprilTagSystem();bridge=QtSystemBridge(system)
+    images=[];results=[]
+    bridge.frame_ready.connect(images.append);bridge.result_ready.connect(results.append)
+    image=np.full((20,30,3),255,np.uint8);matrix=np.array([[40.,0,15],[0,40.,10],[0,0,1.]])
+    system.frames.set_stream_info(matrix,np.zeros(5));system.frames.publish(image.copy())
+    system._latest=system.locator.process(image,matrix,np.zeros(5))
+    bridge.poll();bridge.poll()
+    assert len(images)==len(results)==1
+    assert results[0].targets==()
+    qimage=bgr_to_qimage(image);image[:]=0
+    assert qimage.pixelColor(0,0).red()==255
+    system.stop_camera();bridge.poll()
+    assert images[-1] is None and results[-1] is None
+    bridge.stop();bridge.deleteLater()

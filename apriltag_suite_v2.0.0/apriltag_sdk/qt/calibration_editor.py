@@ -1,18 +1,19 @@
+from __future__ import annotations
 """File-backed Legacy calibration editor. All widgets run on the GUI thread."""
 import copy
 import json
 from pathlib import Path
 import numpy as np
-from PySide6.QtCore import Signal, Qt
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFormLayout,
+from PyQt6.QtCore import pyqtSignal, Qt
+from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFormLayout,
     QLabel, QDoubleSpinBox, QComboBox, QPushButton, QFileDialog, QMessageBox,
     QTabWidget, QGroupBox, QScrollArea)
-from calibration import (CalibrationDocument, CalibrationChain, CalibrationError,
+from ..calibration import (CalibrationDocument, CalibrationChain, CalibrationError,
     calibration_readiness, matrix_rpy_deg, document_hash)
 
 
 class DocumentEditor(QWidget):
-    changed = Signal()
+    changed = pyqtSignal()
 
     def __init__(self, kind, settings):
         super().__init__()
@@ -31,7 +32,7 @@ class DocumentEditor(QWidget):
         layout.addLayout(row)
         self.metadata = QLabel()
         self.metadata.setWordWrap(True)
-        self.metadata.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.metadata.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         layout.addWidget(self.metadata)
         self.form_widget = QWidget()
         form = QFormLayout(self.form_widget)
@@ -77,7 +78,7 @@ class DocumentEditor(QWidget):
         layout.addWidget(self.form_widget)
         self.matrix_label = QLabel()
         self.matrix_label.setWordWrap(True)
-        self.matrix_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.matrix_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         layout.addWidget(self.matrix_label)
         self.error = QLabel()
         self.error.setWordWrap(True)
@@ -199,7 +200,7 @@ class DocumentEditor(QWidget):
 
 
 class CalibrationPanel(QGroupBox):
-    chain_changed = Signal(object)
+    chain_changed = pyqtSignal(object)
 
     def __init__(self, settings):
         super().__init__("坐标标定链 · Legacy 文件数据")
@@ -260,7 +261,7 @@ class CalibrationPanel(QGroupBox):
             if not path:
                 default_name = ("camera_to_gimbal_default.json" if kind == "camera"
                                 else "cr10a_arm_to_pantilt_charuco_calibration.json")
-                path = str(Path(__file__).resolve().parent / "calibration_reference" / default_name)
+                path = str(Path(__file__).resolve().parents[1] / "assets" / "calibration" / default_name)
             if path:
                 self.editors[kind].load(path, restore=True)
         self.refresh_chain()
@@ -288,6 +289,14 @@ class CalibrationPanel(QGroupBox):
         self.readiness_label.setStyleSheet("color:#b00020;font-weight:600;" if blocked else "color:#187a2f;")
         self.export_btn.setEnabled(cam is not None and arm is not None and not blocked)
         self.chain_changed.emit(chain)
+
+    def bind_locator(self, locator):
+        """One-way UI -> core binding. Call once after constructing this panel."""
+        def sync(_chain):
+            locator.set_calibration_documents(self.editors["camera"].document,
+                self.editors["arm"].document, self.source.currentData())
+        self.chain_changed.connect(sync)
+        sync(None)
 
     def export_pair(self):
         cam, arm = (self.editors[k].document for k in ("camera", "arm"))

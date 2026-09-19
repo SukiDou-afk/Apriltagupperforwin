@@ -1,0 +1,8 @@
+# CPython 3.8.x; use in a clean 64-bit environment.
+numpy==1.24.4
+opencv-contrib-python-headless==4.10.0.84
+PyQt6==6.7.1
+PyQt6-Qt6==6.7.3
+PyQt6-sip==13.8.0
+pyrealsense2==2.55.1.6486
+pyserial==3.5

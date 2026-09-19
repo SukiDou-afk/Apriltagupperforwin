@@ -1,0 +1,6 @@
+include README.md requirements-py38.txt requirements-py314.txt apriltag_upper.py
+include install_current_env.bat run.bat
+recursive-include docs *.md *.png
+recursive-include examples *.py
+recursive-include tests *.py
+recursive-include tags *.png
